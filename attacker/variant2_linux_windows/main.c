@@ -75,7 +75,7 @@ void recover(void) {
 
         int max = 1;
 
-        if (timeout++ > 500)
+        if (timeout++ > 200)
         {
         	timeout = 0;
 
