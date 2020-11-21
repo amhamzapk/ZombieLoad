@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
   return 0;
 }
 
-
+int timeout = 0;
 void recover(void) {
 
     /* Recover value from cache and update histogram */
@@ -75,20 +75,25 @@ void recover(void) {
 
         int max = 1;
 
-        for (int i = FROM; i <= TO; i++) {
-          if (hist[i] > max) {
-            max = hist[i];
-          }
-        }
+        if (timeout++ > 500)
+        {
+        	timeout = 0;
 
-        for (int i = FROM; i <= TO; i++) {
-            printf("%c: (%4u) ", i, (unsigned int)hist[i]);
-            for (int j = 0; j < hist[i] * 60 / max; j++) {
-              printf("#");
-            }
-            printf("\n");
-        }
+			for (int i = FROM; i <= TO; i++) {
+			  if (hist[i] > max) {
+				max = hist[i];
+			  }
+			}
 
-        fflush(stdout);
+			for (int i = FROM; i <= TO; i++) {
+				printf("%c: (%4u) ", i, (unsigned int)hist[i]);
+				for (int j = 0; j < hist[i] * 60 / max; j++) {
+				  printf("#");
+				}
+				printf("\n");
+			}
+
+			fflush(stdout);
+        }
     }    
 }
