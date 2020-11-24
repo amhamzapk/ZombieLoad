@@ -7,6 +7,7 @@ char __attribute__((aligned(4096))) secret[8192];
 
 int main(int argc, char* argv[]) {
   char key = 'X';
+  printf("Secret memory address -> %p (Should be 4096 aligned)..\n\n", &secret[0]);
     
   if(argc >= 2) {
     key = argv[1][0];
