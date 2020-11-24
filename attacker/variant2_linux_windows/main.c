@@ -73,7 +73,9 @@ int main(int argc, char *argv[])
 
       ++ not_aborted;
       xend();
-      ++ aborted;
+    }
+    else {
+        ++ aborted;
     }
 #else
 
