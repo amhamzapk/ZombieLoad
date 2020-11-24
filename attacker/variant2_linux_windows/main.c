@@ -16,6 +16,8 @@ char __attribute__((aligned(4096))) mapping[4096];
 size_t hist[256];
 volatile long long aborted = 0;
 volatile long long not_aborted = 0;
+volatile int temp_cnter = 0;
+#define CNTER_LIMIT 1000
 void recover(void);
 int main(int argc, char *argv[])
 {
@@ -42,7 +44,7 @@ int main(int argc, char *argv[])
     flush(mapping);
 #if 1
     /* Begin transaction and recover value */
-    if(xbegin() == (~0u)) {
+    if(xbegin() != (0u)) {
 
 	 /*
 	  * Reference: Intel Deep Dive TSX
@@ -74,6 +76,7 @@ int main(int argc, char *argv[])
       ++ not_aborted;
       xend();
     }
+
     else {
         ++ aborted;
     }
@@ -111,6 +114,11 @@ int main(int argc, char *argv[])
     
     /* Recover through probe mem array */
     recover();
+
+    if (++temp_cnter < CNTER_LIMIT) {
+    	printf("Aborted Count => %lld\n", aborted);
+    	printf("Not-Aborted Count => %lld\n", not_aborted);
+    }
   }
 
   return 0;
@@ -151,9 +159,6 @@ void recover(void) {
 				}
 				printf("\n");
 			}
-
-			printf("Aborted Count => %lld\n", aborted);
-			printf("Not-Aborted Count => %lld\n", not_aborted);
 
 			fflush(stdout);
         }
