@@ -17,7 +17,6 @@ size_t hist[256];
 volatile long long aborted = 0;
 volatile long long not_aborted = 0;
 void recover(void);
-int
 int main(int argc, char *argv[])
 {
   if(!has_tsx()) {
@@ -151,8 +150,8 @@ void recover(void) {
 				printf("\n");
 			}
 
-			printf("Aborted Count => %d\n", aborted);
-			printf("Not-Aborted Count => %d\n", not_aborted);
+			printf("Aborted Count => %lld\n", aborted);
+			printf("Not-Aborted Count => %lld\n", not_aborted);
 
 			fflush(stdout);
         }
