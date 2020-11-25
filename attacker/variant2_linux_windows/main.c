@@ -60,11 +60,12 @@ int main(int argc, char *argv[])
 							  "movq %1, %%rcx;"
 	  	  	  	  	  	  	  "incq %%rcx;"
 							  "movq %%rcx, %1;"
+				  	  	  	  "movq $0, %0;"
 							  "abort:"
 							  "movq %2, %%rdx;"
 				  	  	  	  "incq %%rdx;"
 							  "movq %%rdx, %2;"
-	    					  "movq $1, %0"
+	    					  "movq $1, %0;"
 	    					  : "=g"(abort_flag), "=g"(aborted), "=g"(not_aborted) : "r" (mapping), "r" (mem), "r"(aborted), "r"(not_aborted) : "rcx", "rdx"
 	    );
 
@@ -112,8 +113,10 @@ int main(int argc, char *argv[])
 #endif
 
 #ifdef ASSEMBLY
+    /*
+     * We will only have foot print in cache when transaction is aborted
+     */
     if (abort_flag) {
-    	abort_flag = 0;
     	recover();
     }
 #else
