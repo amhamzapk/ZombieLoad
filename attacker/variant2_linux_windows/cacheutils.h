@@ -67,6 +67,30 @@ int has_tsx() {
   }
 }
 // ---------------------------------------------------------------------------
+int flush_only(void *ptr) {
+  uint64_t start = 0, end = 0;
+
+#if USE_RDTSC_BEGIN_END
+  start = rdtsc_begin();
+#else
+//  start = rdtsc();
+#endif
+//  maccess(ptr);
+#if USE_RDTSC_BEGIN_END
+  end = rdtsc_end();
+#else
+//  end = rdtsc();
+#endif
+
+//  mfence();
+
+  flush(ptr);
+
+  if (end - start < CACHE_MISS) {
+    return 1;
+  }
+  return 0;
+}
 int flush_reload(void *ptr) {
   uint64_t start = 0, end = 0;
 
