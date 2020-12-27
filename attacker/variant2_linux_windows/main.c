@@ -7,8 +7,8 @@
 #include <string.h>
 #include "cacheutils.h"
 //#define WHILE_ONLY /* NOT DEPENDENT ON ANY FLAG */
-//#define FLUSH_ONLY /* NORMAL FLAG AND FLUSH RELOAD ONLY FLAGMUST BE OFF FOR THIS TO WORK, */
-#define FLUSH_RELOAD_ONLY /* NORMAL FLAG AND FLUSH ONLY MUST BE OFF FOR THIS TO WORK */
+#define FLUSH_ONLY /* NORMAL FLAG AND FLUSH RELOAD ONLY FLAGMUST BE OFF FOR THIS TO WORK, */
+//#define FLUSH_RELOAD_ONLY /* NORMAL FLAG AND FLUSH ONLY MUST BE OFF FOR THIS TO WORK */
 
 //#define NORMAL   /* NOT DEPENDENT ON ANY FLAG */
 //#define ONLY_ABORT /* NORMAL FLAG MUST BE SET FOR THIS TO WORK */
@@ -19,6 +19,7 @@ int print_once = 0;
 //#define NORMAL
 //void maccess(void *p) { asm volatile("movq (%0), %%rax\n" : : "c"(p) : "rax"); }
 
+char __attribute__((aligned(4096))) mem_temp[4096*64];
 char __attribute__((aligned(4096))) mem[256 * 4096];
 char __attribute__((aligned(64))) mem2[32*4096];
 char __attribute__((aligned(4096))) mapping[4096];
@@ -29,7 +30,6 @@ volatile int temp_cnter = 0;
 #define CNTER_LIMIT 1000
 void recover(void);
 volatile bool abort_flag = 0;
-
 
 volatile long long temp_cnt = 0;
 int main(int argc, char *argv[])
@@ -58,13 +58,18 @@ int main(int argc, char *argv[])
 	  print_once = 1;
 	  printf("Busy Wait {while(1)} loop...\n");
   }
-  while(1);
+  while(1) {
+//	  usleep(10);
+  }
 #endif
 
   while (true) {
 #ifndef NORMAL
 #if defined(FLUSH_ONLY) || defined (FLUSH_RELOAD_ONLY)
-	  recover();
+//	  recover();
+//	  int temp_char = 0;
+	  flush(mem_temp + (64 * 31));
+//	  usleep(1);
 #endif
 #else
 #ifndef ONLY_ABORT
